@@ -1394,158 +1394,270 @@
             }
         }
 	</script>
-    <script>
-// === ПАРОЛЬ АДМИНИСТРАТОРА ===
-const ADMIN_PASSWORD = "яналох"; // Измените этот пароль!
+<!-- Кнопка админа (с паролем) -->
+<script>
+// === СИСТЕМА ЗАКАЗОВ ДЛЯ АДМИНА ===
 
-// === СОЗДАЕМ КНОПКУ АДМИНА ===
+// 1. ПАРОЛЬ ДОСТУПА (ИЗМЕНИТЕ НА СВОЙ!)
+const ADMIN_PASSWORD = "яналох";
+
+// 2. КНОПКА АДМИНА (скрытая)
 const adminBtn = document.createElement('button');
 adminBtn.innerHTML = '🔐';
-adminBtn.title = 'Панель администратора (Alt+A)';
+adminBtn.id = 'adminButton';
+adminBtn.title = 'Панель заказов (Alt+A)';
 adminBtn.style.cssText = `
     position: fixed;
-    bottom: 30px;
-    right: 30px;
-    width: 60px;
-    height: 60px;
-    background: linear-gradient(135deg, #ff66a3, #6bcc70);
+    top: 20px;
+    left: 20px;
+    width: 50px;
+    height: 50px;
+    background: #ff66a3;
     color: white;
     border: none;
     border-radius: 50%;
-    font-size: 24px;
+    font-size: 20px;
     cursor: pointer;
     z-index: 9999;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-    transition: all 0.3s;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    opacity: 0.3;
+    transition: opacity 0.3s;
 `;
+adminBtn.onmouseover = () => adminBtn.style.opacity = '1';
+adminBtn.onmouseout = () => adminBtn.style.opacity = '0.3';
 
-// Добавляем кнопку на страницу
-document.body.appendChild(adminBtn);
-
-// === ФУНКЦИЯ ПРОВЕРКИ ПАРОЛЯ ===
-function checkAdminPassword() {
-    const password = prompt("🔐 ВВЕДИТЕ ПАРОЛЬ АДМИНИСТРАТОРА", "");
+// 3. ФУНКЦИЯ ДЛЯ СОХРАНЕНИЯ ЗАКАЗА (исправленная)
+function saveOrderToServer(formData, cartItems) {
+    // Рассчитываем сумму
+    const total = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     
-    if (password === null) {
-        return; // Пользователь нажал "Отмена"
+    // Формируем заказ
+    const order = {
+        id: Date.now(),
+        timestamp: new Date().toLocaleString('ru-RU'),
+        customer: {
+            name: formData.name || 'Не указано',
+            phone: formData.phone || 'Не указано',
+            city: formData.city || '',
+            address: formData.address || '',
+            email: formData.email || ''
+        },
+        items: cartItems.map(item => ({
+            name: item.name || 'Товар',
+            price: item.price || 0,
+            quantity: item.quantity || 1
+        })),
+        total: total,
+        message: formData.message || '',
+        status: 'новый'
+    };
+    
+    console.log('📦 Сохранение заказа:', order);
+    
+    // Сохраняем в localStorage (для текущей сессии)
+    let localOrders = JSON.parse(localStorage.getItem('local_orders')) || [];
+    localOrders.unshift(order);
+    localStorage.setItem('local_orders', JSON.stringify(localOrders));
+    
+    // Показываем уведомление для админа (если он на сайте)
+    if (localStorage.getItem('admin_logged_in') === 'true') {
+        showAdminNotification(order);
     }
     
-    if (password === ADMIN_PASSWORD) {
-        // Пароль верный - ПОКАЗЫВАЕМ ПАНЕЛЬ
-        createAdminPanel();
-    } else {
-        alert("⛔ НЕВЕРНЫЙ ПАРОЛЬ!");
-    }
+    // Сохраняем в общий список заказов
+    saveToAllOrders(order);
+    
+    return order;
 }
 
-// === ФУНКЦИЯ СОЗДАНИЯ ПАНЕЛИ ===
-function createAdminPanel() {
-    console.log("Создаю панель..."); // Для отладки
+// 4. СОХРАНЕНИЕ В ОБЩИЙ СПИСОК (симуляция сервера)
+function saveToAllOrders(order) {
+    // Это будет работать на всех устройствах через localStorage
+    // В реальном проекте здесь должен быть AJAX запрос к серверу
+    let allOrders = JSON.parse(localStorage.getItem('evergarden_all_orders')) || [];
+    allOrders.unshift(order);
     
-    // Закрываем старую панель если есть
-    const oldPanel = document.getElementById('adminPanel');
-    if (oldPanel) {
-        oldPanel.remove();
-    }
+    // Сохраняем в localStorage (имитация базы данных)
+    localStorage.setItem('evergarden_all_orders', JSON.stringify(allOrders));
     
-    // ПОЛУЧАЕМ РЕАЛЬНЫЕ ДАННЫЕ ИЗ ВАШЕГО МАГАЗИНА
-    let orders = [];
+    console.log('💾 Заказ сохранен в общую базу. Всего заказов:', allOrders.length);
+}
+
+// 5. УВЕДОМЛЕНИЕ ДЛЯ АДМИНА
+function showAdminNotification(order) {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 80px;
+        left: 20px;
+        background: linear-gradient(135deg, #2ed573, #6bcc70);
+        color: white;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        z-index: 10000;
+        max-width: 300px;
+        animation: slideIn 0.5s ease;
+    `;
     
-    // Пробуем разные ключи localStorage
-    const possibleKeys = ['orders', 'notifications', 'evergarden_orders', 'cart_orders'];
+    notification.innerHTML = `
+        <div style="display: flex; align-items: center; margin-bottom: 10px;">
+            <div style="font-size: 24px; margin-right: 10px;">🎉</div>
+            <strong>НОВЫЙ ЗАКАЗ!</strong>
+        </div>
+        <div style="font-size: 14px;">
+            <div>👤 ${order.customer.name}</div>
+            <div>📞 ${order.customer.phone}</div>
+            <div>💰 ${order.total.toFixed(2)} BYN</div>
+            <div style="font-size: 12px; margin-top: 5px; opacity: 0.8;">
+                ${new Date().toLocaleTimeString()}
+            </div>
+        </div>
+    `;
     
-    for (let key of possibleKeys) {
-        try {
-            const data = localStorage.getItem(key);
-            if (data) {
-                const parsed = JSON.parse(data);
-                if (Array.isArray(parsed)) {
-                    orders = orders.concat(parsed);
-                    console.log(`Нашли заказы в ${key}:`, parsed.length);
-                }
+    document.body.appendChild(notification);
+    
+    // Анимация
+    if (!document.getElementById('adminNotificationStyles')) {
+        const style = document.createElement('style');
+        style.id = 'adminNotificationStyles';
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(-100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
             }
-        } catch (e) {
-            console.log(`Ошибка чтения ${key}:`, e);
-        }
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(-100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
     }
     
-    console.log("Всего заказов:", orders.length);
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.5s ease';
+        setTimeout(() => notification.remove(), 500);
+    }, 5000);
+}
+
+// 6. ПАНЕЛЬ АДМИНА С ПАРОЛЕМ
+function openAdminPanel() {
+    const password = prompt("🔐 ВВЕДИТЕ ПАРОЛЬ АДМИНИСТРАТОРА:", "");
     
-    // Создаем HTML для заказов
+    if (password === null) return;
+    
+    if (password !== ADMIN_PASSWORD) {
+        alert("⛔ НЕВЕРНЫЙ ПАРОЛЬ!");
+        return;
+    }
+    
+    // Сохраняем статус входа
+    localStorage.setItem('admin_logged_in', 'true');
+    
+    // Получаем ВСЕ заказы из всех источников
+    const allOrders = JSON.parse(localStorage.getItem('evergarden_all_orders')) || [];
+    const localOrders = JSON.parse(localStorage.getItem('local_orders')) || [];
+    const notifications = JSON.parse(localStorage.getItem('notifications')) || [];
+    
+    // Объединяем все заказы
+    const combinedOrders = [...allOrders, ...localOrders, ...notifications];
+    
+    // Удаляем дубликаты по ID
+    const uniqueOrders = Array.from(new Map(combinedOrders.map(order => [order.id, order])).values());
+    
+    // Сортируем по дате (новые сверху)
+    uniqueOrders.sort((a, b) => b.id - a.id);
+    
+    // Создаем панель
+    const panel = document.createElement('div');
+    panel.id = 'adminPanel';
+    
     let ordersHTML = '';
     
-    if (orders.length === 0) {
+    if (uniqueOrders.length === 0) {
         ordersHTML = `
-            <div style="text-align: center; padding: 40px; color: #666;">
+            <div style="text-align: center; padding: 50px; color: #666;">
                 <div style="font-size: 48px; margin-bottom: 20px;">📭</div>
-                <h3>Нет заказов</h3>
-                <p>Сделайте тестовый заказ через магазин</p>
-                <button onclick="createTestOrder()" style="
-                    background: #3742fa;
-                    color: white;
-                    border: none;
-                    padding: 10px 20px;
-                    border-radius: 5px;
-                    cursor: pointer;
-                    margin-top: 20px;
-                ">
-                    Создать тестовый заказ
-                </button>
+                <h3>Заказов нет</h3>
+                <p>Ожидайте заказы от клиентов</p>
             </div>
         `;
     } else {
-        // Сортируем по ID (новые сверху)
-        orders.sort((a, b) => (b.id || 0) - (a.id || 0));
-        
-        orders.forEach((order, index) => {
-            const customerName = order.name || order.customer?.name || 'Не указано';
-            const customerPhone = order.phone || order.customer?.phone || 'Не указано';
-            const customerAddress = order.address || order.customer?.address || 'Не указано';
-            const total = order.total || 0;
+        uniqueOrders.forEach((order, index) => {
+            const itemsText = order.items.map(item => 
+                `${item.name} × ${item.quantity}`
+            ).join(', ');
             
             ordersHTML += `
                 <div style="
                     background: ${index % 2 === 0 ? '#f8f9fa' : 'white'};
                     border-radius: 10px;
-                    padding: 15px;
+                    padding: 20px;
                     margin-bottom: 15px;
-                    border-left: 4px solid #ff6b81;
+                    border-left: 4px solid ${order.status === 'новый' ? '#ff6b81' : '#6bcc70'};
                 ">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                        <strong style="color: #333;">Заказ #${order.id || 'Нет ID'}</strong>
-                        <span style="color: #888; font-size: 12px;">${order.date || 'Дата не указана'}</span>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+                        <div>
+                            <strong style="color: #333; font-size: 18px;">
+                                Заказ #${order.id.toString().slice(-6)}
+                            </strong>
+                            <div style="color: #888; font-size: 12px; margin-top: 5px;">
+                                📅 ${order.timestamp || order.date || 'Дата не указана'}
+                            </div>
+                        </div>
+                        <span style="
+                            background: ${order.status === 'новый' ? '#ff6b81' : '#6bcc70'};
+                            color: white;
+                            padding: 5px 15px;
+                            border-radius: 20px;
+                            font-size: 12px;
+                        ">
+                            ${order.status || 'новый'}
+                        </span>
                     </div>
                     
                     <div style="margin-bottom: 15px;">
-                        <p><strong>👤 Клиент:</strong> ${customerName}</p>
-                        <p><strong>📞 Телефон:</strong> ${customerPhone}</p>
-                        <p><strong>📍 Адрес:</strong> ${customerAddress}</p>
-                        <p><strong>💰 Сумма:</strong> ${total.toFixed(2)} BYN</p>
+                        <p><strong>👤 Клиент:</strong> ${order.customer?.name || order.name || 'Не указано'}</p>
+                        <p><strong>📞 Телефон:</strong> ${order.customer?.phone || order.phone || 'Не указано'}</p>
+                        <p><strong>📍 Адрес:</strong> ${order.customer?.city || ''} ${order.customer?.address || order.address || 'Не указано'}</p>
+                        ${order.customer?.email || order.email ? `<p><strong>📧 Email:</strong> ${order.customer?.email || order.email}</p>` : ''}
+                        <p><strong>🛒 Товары:</strong> ${itemsText}</p>
+                        ${order.message ? `<p><strong>💬 Сообщение:</strong> ${order.message}</p>` : ''}
+                        <p><strong>💰 Сумма:</strong> ${order.total.toFixed(2)} BYN</p>
                     </div>
                     
                     <div style="display: flex; gap: 10px;">
-                        <button onclick="adminCall('${customerPhone}')" style="
+                        <button onclick="adminCallCustomer('${order.customer?.phone || order.phone || ''}')" style="
                             background: #3742fa;
                             color: white;
                             border: none;
                             padding: 8px 15px;
                             border-radius: 5px;
                             cursor: pointer;
-                            font-size: 14px;
                         ">
                             📞 Позвонить
                         </button>
                         
-                        <button onclick="markOrderComplete(${order.id || index})" style="
+                        <button onclick="markOrderAsCompleted(${order.id})" style="
                             background: #2ed573;
                             color: white;
                             border: none;
                             padding: 8px 15px;
                             border-radius: 5px;
                             cursor: pointer;
-                            font-size: 14px;
                         ">
                             ✅ Выполнено
+                        </button>
+                        
+                        <button onclick="deleteAdminOrder(${order.id})" style="
+                            background: #ff4757;
+                            color: white;
+                            border: none;
+                            padding: 8px 15px;
+                            border-radius: 5px;
+                            cursor: pointer;
+                        ">
+                            🗑️ Удалить
                         </button>
                     </div>
                 </div>
@@ -1553,9 +1665,6 @@ function createAdminPanel() {
         });
     }
     
-    // СОЗДАЕМ ПАНЕЛЬ
-    const panel = document.createElement('div');
-    panel.id = 'adminPanel';
     panel.innerHTML = `
         <div style="
             position: fixed;
@@ -1578,14 +1687,26 @@ function createAdminPanel() {
                 border-bottom: 2px solid #eee;
             ">
                 <div>
-                    <h1 style="color: #ff66a3; margin: 0;">EVERGARDEN</h1>
-                    <p style="color: #666; margin: 5px 0 0 0;">Панель управления</p>
+                    <h1 style="color: #ff66a3; margin: 0;">EVERGARDEN - ПАНЕЛЬ УПРАВЛЕНИЯ</h1>
+                    <p style="color: #666; margin: 5px 0 0 0;">
+                        Заказов: <strong>${uniqueOrders.length}</strong> | 
+                        Сегодня: <strong>${new Date().toLocaleDateString('ru-RU')}</strong>
+                    </p>
                 </div>
                 
                 <div>
-                    <span style="background: #6bcc70; color: white; padding: 5px 15px; border-radius: 20px;">
-                        Заказы: ${orders.length}
-                    </span>
+                    <button onclick="exportAllOrders()" style="
+                        background: #3742fa;
+                        color: white;
+                        border: none;
+                        padding: 10px 20px;
+                        border-radius: 5px;
+                        cursor: pointer;
+                        margin-right: 10px;
+                    ">
+                        📥 Экспорт
+                    </button>
+                    
                     <button onclick="closeAdminPanel()" style="
                         background: #ff4757;
                         color: white;
@@ -1595,65 +1716,72 @@ function createAdminPanel() {
                         border-radius: 50%;
                         font-size: 20px;
                         cursor: pointer;
-                        margin-left: 15px;
                     ">
                         ×
                     </button>
                 </div>
             </div>
             
+            <!-- Статистика -->
+            <div style="
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 20px;
+                border-radius: 10px;
+                margin-bottom: 30px;
+            ">
+                <h3 style="margin-bottom: 15px;">📊 СТАТИСТИКА</h3>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; text-align: center;">
+                    <div>
+                        <div style="font-size: 24px; font-weight: bold;">${uniqueOrders.length}</div>
+                        <div>Всего заказов</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 24px; font-weight: bold;">
+                            ${uniqueOrders.reduce((sum, order) => sum + (order.total || 0), 0).toFixed(2)} BYN
+                        </div>
+                        <div>Общая сумма</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 24px; font-weight: bold;">
+                            ${uniqueOrders.filter(o => o.status === 'новый').length}
+                        </div>
+                        <div>Новых</div>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Список заказов -->
-            <div id="ordersList">
+            <div id="adminOrdersList">
                 ${ordersHTML}
             </div>
             
-            <!-- Кнопки -->
+            <!-- Инструкция -->
             <div style="
-                position: fixed;
-                bottom: 20px;
-                right: 20px;
-                display: flex;
-                gap: 10px;
+                margin-top: 40px;
+                padding: 20px;
+                background: #f8f9fa;
+                border-radius: 10px;
+                color: #666;
+                font-size: 14px;
             ">
-                <button onclick="exportOrders()" style="
-                    background: #3742fa;
-                    color: white;
-                    border: none;
-                    padding: 12px 24px;
-                    border-radius: 25px;
-                    cursor: pointer;
-                    font-weight: bold;
-                ">
-                    📥 Экспорт заказов
-                </button>
-                
-                <button onclick="clearOrders()" style="
-                    background: #ffa502;
-                    color: white;
-                    border: none;
-                    padding: 12px 24px;
-                    border-radius: 25px;
-                    cursor: pointer;
-                    font-weight: bold;
-                ">
-                    🗑️ Очистить все
-                </button>
+                <p><strong>💡 Как использовать:</strong></p>
+                <p>1. Заказы сохраняются даже после закрытия браузера</p>
+                <p>2. Нажмите "📞 Позвонить" для связи с клиентом</p>
+                <p>3. Нажмите "✅ Выполнено" чтобы отметить заказ</p>
+                <p>4. Нажмите "📥 Экспорт" чтобы скачать все заказы</p>
+                <p style="margin-top: 10px; font-size: 12px; color: #888;">
+                    🔒 Пароль доступа: ${ADMIN_PASSWORD}
+                </p>
             </div>
         </div>
     `;
     
-    // Добавляем панель на страницу
     document.body.appendChild(panel);
-    
-    // Блокируем прокрутку
     document.body.style.overflow = 'hidden';
-    
-    console.log("Панель создана!");
 }
 
-// === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
-
-// Закрыть панель
+// 7. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ АДМИНА
 function closeAdminPanel() {
     const panel = document.getElementById('adminPanel');
     if (panel) {
@@ -1662,142 +1790,163 @@ function closeAdminPanel() {
     }
 }
 
-// Позвонить клиенту
-function adminCall(phone) {
-    if (phone && phone !== 'Не указано') {
-        alert(`📞 ЗВОНИМ КЛИЕНТУ:\n${phone}`);
+function adminCallCustomer(phone) {
+    if (phone && phone !== 'Не указано' && phone !== '') {
+        alert(`📞 ЗВОНИМ КЛИЕНТУ:\n${phone}\n\n(В реальной системе здесь будет автодозвон)`);
     } else {
         alert('Номер телефона не указан');
     }
 }
 
-// Отметить заказ выполненным
-function markOrderComplete(orderId) {
-    if (confirm('Отметить заказ как выполненный?')) {
-        alert('Заказ #' + orderId + ' помечен как выполненный!');
-    }
-}
-
-// Создать тестовый заказ
-function createTestOrder() {
-    const testOrder = {
-        id: Date.now(),
-        name: "Тестовый Клиент",
-        phone: "+375 (29) 123-45-67",
-        address: "г. Брест, ул. Тестовая, 15",
-        total: 150.50,
-        date: new Date().toLocaleString(),
-        items: [
-            { name: "Букет 'Нежность'", price: 85.50, quantity: 1 },
-            { name: "Букет 'Страсть'", price: 65.00, quantity: 1 }
-        ]
-    };
-    
-    // Сохраняем в localStorage
-    let orders = JSON.parse(localStorage.getItem('orders')) || [];
-    orders.push(testOrder);
-    localStorage.setItem('orders', JSON.stringify(orders));
-    
-    alert('✅ Тестовый заказ создан!');
-    
-    // Обновляем панель
-    closeAdminPanel();
-    createAdminPanel();
-}
-
-// Экспорт заказов
-function exportOrders() {
-    let orders = [];
-    
-    // Собираем все заказы
-    const possibleKeys = ['orders', 'notifications', 'evergarden_orders', 'cart_orders'];
-    
-    for (let key of possibleKeys) {
-        try {
-            const data = localStorage.getItem(key);
-            if (data) {
-                const parsed = JSON.parse(data);
-                if (Array.isArray(parsed)) {
-                    orders = orders.concat(parsed);
-                }
+function markOrderAsCompleted(orderId) {
+    if (confirm('Пометить заказ как выполненный?')) {
+        // Обновляем статус заказа
+        let allOrders = JSON.parse(localStorage.getItem('evergarden_all_orders')) || [];
+        allOrders = allOrders.map(order => {
+            if (order.id === orderId) {
+                return { ...order, status: 'выполнен' };
             }
-        } catch (e) {
-            console.log(e);
-        }
+            return order;
+        });
+        localStorage.setItem('evergarden_all_orders', JSON.stringify(allOrders));
+        
+        alert('Заказ #' + orderId + ' отмечен как выполненный!');
+        
+        // Обновляем панель
+        closeAdminPanel();
+        openAdminPanel();
     }
+}
+
+function deleteAdminOrder(orderId) {
+    if (confirm('Удалить этот заказ?')) {
+        let allOrders = JSON.parse(localStorage.getItem('evergarden_all_orders')) || [];
+        allOrders = allOrders.filter(order => order.id !== orderId);
+        localStorage.setItem('evergarden_all_orders', JSON.stringify(allOrders));
+        
+        alert('Заказ удален!');
+        
+        // Обновляем панель
+        closeAdminPanel();
+        openAdminPanel();
+    }
+}
+
+function exportAllOrders() {
+    const allOrders = JSON.parse(localStorage.getItem('evergarden_all_orders')) || [];
     
-    if (orders.length === 0) {
+    if (allOrders.length === 0) {
         alert('Нет заказов для экспорта');
         return;
     }
     
-    // Создаем текстовый файл
-    let text = 'ЗАКАЗЫ EVERGARDEN\n\n';
+    // Формируем CSV
+    let csv = 'ID;Дата;Имя;Телефон;Адрес;Товары;Сумма;Статус\n';
     
-    orders.forEach(order => {
-        text += `Заказ #${order.id || 'Нет ID'}\n`;
-        text += `Дата: ${order.date || 'Нет даты'}\n`;
-        text += `Клиент: ${order.name || 'Не указано'}\n`;
-        text += `Телефон: ${order.phone || 'Не указано'}\n`;
-        text += `Адрес: ${order.address || 'Не указано'}\n`;
-        text += `Сумма: ${order.total ? order.total.toFixed(2) : '0.00'} BYN\n`;
-        text += '─'.repeat(30) + '\n\n';
+    allOrders.forEach(order => {
+        const items = order.items.map(item => 
+            `${item.name} (${item.quantity} шт.)`
+        ).join(', ');
+        
+        csv += `${order.id};${order.timestamp || order.date};${order.customer?.name || order.name};${order.customer?.phone || order.phone};${order.customer?.city || ''} ${order.customer?.address || order.address};"${items}";${order.total};${order.status || 'новый'}\n`;
     });
     
     // Создаем и скачиваем файл
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     
     link.href = url;
-    link.download = `evergarden_orders_${new Date().toLocaleDateString()}.txt`;
+    link.download = `evergarden_orders_${new Date().toISOString().slice(0,10)}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     
-    alert(`Экспортировано ${orders.length} заказов!`);
+    alert(`Экспортировано ${allOrders.length} заказов!`);
 }
 
-// Очистить все заказы
-function clearOrders() {
-    if (confirm('❌ УДАЛИТЬ ВСЕ ЗАКАЗЫ?\n\nЭто действие нельзя отменить!')) {
-        localStorage.removeItem('orders');
-        localStorage.removeItem('notifications');
-        localStorage.removeItem('evergarden_orders');
-        localStorage.removeItem('cart_orders');
+// 8. ПЕРЕХВАТ ОТПРАВКИ ФОРМЫ ЗАКАЗА
+document.addEventListener('DOMContentLoaded', function() {
+    // Добавляем кнопку админа
+    document.body.appendChild(adminBtn);
+    
+    // Находим форму заказа
+    const orderForm = document.getElementById('deliveryForm');
+    
+    if (orderForm) {
+        // Сохраняем оригинальный обработчик
+        const originalSubmit = orderForm.onsubmit;
         
-        alert('Все заказы удалены!');
-        
-        // Обновляем панель
-        closeAdminPanel();
-        createAdminPanel();
-    }
-}
-
-// === НАЗНАЧАЕМ СОБЫТИЯ ===
-
-// Клик по кнопке админа
-adminBtn.onclick = checkAdminPassword;
-
-// Горячая клавиша Alt+A
-document.addEventListener('keydown', function(e) {
-    if (e.altKey && e.key === 'a') {
-        e.preventDefault();
-        checkAdminPassword();
+        // Добавляем новый обработчик
+        orderForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Собираем данные формы
+            const formData = new FormData(this);
+            const formDataObj = {};
+            for (let [key, value] of formData.entries()) {
+                formDataObj[key] = value;
+            }
+            
+            // Получаем товары из корзины
+            const cartItems = JSON.parse(localStorage.getItem('cart')) || [];
+            
+            if (cartItems.length === 0) {
+                alert('Корзина пуста! Добавьте товары перед оформлением заказа.');
+                return;
+            }
+            
+            // Сохраняем заказ
+            const savedOrder = saveOrderToServer(formDataObj, cartItems);
+            
+            // Очищаем корзину
+            localStorage.removeItem('cart');
+            updateCart(); // Обновляем отображение корзины
+            
+            // Показываем сообщение пользователю
+            alert(`🎉 Спасибо за заказ #${savedOrder.id}!\nМы свяжемся с вами в ближайшее время.`);
+            
+            // Закрываем модальное окно
+            const checkoutModal = document.getElementById('checkoutModal');
+            if (checkoutModal) {
+                checkoutModal.classList.remove('active');
+            }
+            
+            // Сбрасываем форму
+            this.reset();
+            
+            // Вызываем оригинальный обработчик если есть
+            if (originalSubmit) {
+                originalSubmit.call(this, e);
+            }
+        });
     }
     
-    // Escape закрывает панель
-    if (e.key === 'Escape') {
-        closeAdminPanel();
+    // Назначаем обработчик для кнопки админа
+    adminBtn.addEventListener('click', openAdminPanel);
+    
+    // Горячая клавиша Alt+A
+    document.addEventListener('keydown', function(e) {
+        if (e.altKey && e.key === 'a') {
+            e.preventDefault();
+            openAdminPanel();
+        }
+        if (e.key === 'Escape') {
+            closeAdminPanel();
+        }
+    });
+    
+    // Проверяем, был ли админ уже авторизован
+    if (localStorage.getItem('admin_logged_in') === 'true') {
+        console.log('✅ Админ авторизован. Уведомления будут показываться.');
     }
 });
 
-// === ОТЛАДКА ===
-console.log('✅ Админ-панель загружена!');
-console.log('🔐 Пароль:', ADMIN_PASSWORD);
-console.log('👉 Нажмите Alt+A или кнопку 🔐 в правом нижнем углу');
+console.log('✅ Система заказов для админа загружена!');
+console.log('🔐 Пароль админа:', ADMIN_PASSWORD);
+console.log('👉 Нажмите кнопку 🔐 в левом верхнем углу');
 
 </script>
-</body>
 
+</body>
 </html>
